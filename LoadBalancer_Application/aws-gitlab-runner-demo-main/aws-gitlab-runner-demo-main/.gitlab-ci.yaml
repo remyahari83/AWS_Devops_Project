@@ -1,0 +1,64 @@
+image:
+  name: hashicorp/terraform:latest
+  entrypoint: [""]
+
+stages:
+  - validate
+  - plan
+  - apply
+
+variables:
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+  AWS_REGION: "us-east-1"
+  TFSTATE_BUCKET: "aws-gitlab-terraform-state-12345"
+  TFSTATE_KEY: "gitlab-runner-test/terraform.tfstate"
+
+before_script:
+  - echo "===== Terraform Version ====="
+  - terraform --version
+  - echo "===== AWS Region ====="
+  - echo "$AWS_REGION"
+
+validate:
+  stage: validate
+  script:
+    - cd aws-gitlab-runner
+    - terraform init -backend-config="bucket=$TFSTATE_BUCKET" -backend-config="key=$TFSTATE_KEY" -backend-config="region=$AWS_REGION"
+    - terraform fmt -check
+    - terraform validate
+  tags:
+    - aws-gitlab-runner-demo
+
+plan:
+  stage: plan
+  script:
+    - cd aws-gitlab-runner
+    - terraform init -backend-config="bucket=$TFSTATE_BUCKET" -backend-config="key=$TFSTATE_KEY" -backend-config="region=$AWS_REGION"
+    - terraform version
+    - terraform providers
+    - echo "=== VPC module version ==="
+    - grep -n -A15 -B10 'aws_default_network_acl' .terraform/modules/vpc/main.tf
+
+    - echo "=== AWS provider in lock file ==="
+    - grep -n 'hashicorp/aws' .terraform.lock.hcl
+    - terraform plan -out=tfplan
+  artifacts:
+    paths:
+      - aws-gitlab-runner/tfplan
+  tags:
+    - aws-gitlab-runner-demo
+
+apply:
+  stage: apply
+  dependencies:
+    - plan
+  script:
+    - cd aws-gitlab-runner
+    - terraform init -backend-config="bucket=$TFSTATE_BUCKET" -backend-config="key=$TFSTATE_KEY" -backend-config="region=$AWS_REGION"
+    - terraform version
+    - terraform providers
+    - terraform apply -auto-approve tfplan
+  when: manual
+  tags:
+    - aws-gitlab-runner-demo

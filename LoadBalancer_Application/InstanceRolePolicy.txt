@@ -1,0 +1,166 @@
+{
+	"Version": "2012-10-17",
+	"Statement": [
+		{
+			"Sid": "TerraformStateBucket",
+			"Effect": "Allow",
+			"Action": [
+				"s3:ListBucket",
+				"s3:GetBucketVersioning",
+				"s3:PutBucketVersioning"
+			],
+			"Resource": "arn:aws:s3:::aws-gitlab-terraform-state-12345"
+		},
+		{
+			"Sid": "TerraformStateObjects",
+			"Effect": "Allow",
+			"Action": [
+				"s3:GetObject",
+				"s3:PutObject",
+				"s3:DeleteObject"
+			],
+			"Resource": "arn:aws:s3:::aws-gitlab-terraform-state-12345/*"
+		},
+		{
+			"Sid": "TerraformEC2",
+			"Effect": "Allow",
+			"Action": [
+				"ec2:CreateVpc",
+				"ec2:DeleteVpc",
+				"ec2:DescribeVpcs",
+				"ec2:ModifyVpcAttribute",
+				"ec2:DescribeVpcAttribute",
+				"ec2:CreateSubnet",
+				"ec2:DeleteSubnet",
+				"ec2:DescribeSubnets",
+				"ec2:ModifySubnetAttribute",
+				"ec2:CreateRouteTable",
+				"ec2:DeleteRouteTable",
+				"ec2:DescribeRouteTables",
+				"ec2:CreateRoute",
+				"ec2:ReplaceRoute",
+				"ec2:DeleteRoute",
+				"ec2:AssociateRouteTable",
+				"ec2:DisassociateRouteTable",
+				"ec2:CreateInternetGateway",
+				"ec2:AttachInternetGateway",
+				"ec2:DetachInternetGateway",
+				"ec2:DeleteInternetGateway",
+				"ec2:DescribeInternetGateways",
+				"ec2:AllocateAddress",
+				"ec2:ReleaseAddress",
+				"ec2:DescribeAddresses",
+				"ec2:CreateNatGateway",
+				"ec2:DeleteNatGateway",
+				"ec2:DescribeNatGateways",
+				"ec2:CreateSecurityGroup",
+				"ec2:DeleteSecurityGroup",
+				"ec2:DescribeSecurityGroups",
+				"ec2:AuthorizeSecurityGroupIngress",
+				"ec2:AuthorizeSecurityGroupEgress",
+				"ec2:RevokeSecurityGroupIngress",
+				"ec2:RevokeSecurityGroupEgress",
+				"ec2:RunInstances",
+				"ec2:TerminateInstances",
+				"ec2:StartInstances",
+				"ec2:StopInstances",
+				"ec2:DescribeInstances",
+				"ec2:DescribeInstanceStatus",
+				"ec2:ModifyInstanceAttribute",
+				"ec2:CreateTags",
+				"ec2:DeleteTags",
+				"ec2:DescribeTags",
+				"ec2:DescribeImages",
+				"ec2:DescribeInstanceTypes",
+				"ec2:DescribeAvailabilityZones",
+				"ec2:DescribeRegions",
+				"ec2:DescribeVolumes",
+				"ec2:DescribeNetworkInterfaces",
+				"ec2:CreateLaunchTemplate",
+				"ec2:CreateLaunchTemplateVersion",
+				"ec2:ModifyLaunchTemplate",
+				"ec2:DeleteLaunchTemplate",
+				"ec2:DescribeLaunchTemplates",
+				"ec2:DescribeLaunchTemplateVersions",
+				"ec2:DescribeAddressesAttribute",
+				"ec2:DescribeSecurityGroupRules",
+				"ec2:DescribeAccountAttributes",
+				"ec2:DescribeInstanceAttribute",
+				"ec2:DescribeInstanceCreditSpecifications"
+			],
+			"Resource": "*"
+		},
+		{
+			"Sid": "TerraformLoadBalancer",
+			"Effect": "Allow",
+			"Action": [
+				"elasticloadbalancing:CreateLoadBalancer",
+				"elasticloadbalancing:DeleteLoadBalancer",
+				"elasticloadbalancing:DescribeLoadBalancers",
+				"elasticloadbalancing:CreateTargetGroup",
+				"elasticloadbalancing:DeleteTargetGroup",
+				"elasticloadbalancing:DescribeTargetGroups",
+				"elasticloadbalancing:ModifyTargetGroup",
+				"elasticloadbalancing:ModifyTargetGroupAttributes",
+				"elasticloadbalancing:RegisterTargets",
+				"elasticloadbalancing:DeregisterTargets",
+				"elasticloadbalancing:CreateListener",
+				"elasticloadbalancing:DeleteListener",
+				"elasticloadbalancing:DescribeListeners",
+				"elasticloadbalancing:CreateRule",
+				"elasticloadbalancing:DeleteRule",
+				"elasticloadbalancing:DescribeRules",
+				"elasticloadbalancing:ModifyRule",
+				"elasticloadbalancing:ModifyLoadBalancerAttributes",
+				"elasticloadbalancing:AddTags",
+				"elasticloadbalancing:RemoveTags",
+				"elasticloadbalancing:DescribeTargetGroupAttributes",
+				"elasticloadbalancing:DescribeTags",
+				"elasticloadbalancing:DescribeLoadBalancerAttributes",
+				"elasticloadbalancing:DescribeListenerAttributes",
+				"elasticloadbalancing:DescribeTargetHealth"
+			],
+			"Resource": "*"
+		},
+		{
+			"Sid": "TerraformAutoScaling",
+			"Effect": "Allow",
+			"Action": [
+				"autoscaling:CreateAutoScalingGroup",
+				"autoscaling:UpdateAutoScalingGroup",
+				"autoscaling:DeleteAutoScalingGroup",
+				"autoscaling:DescribeAutoScalingGroups",
+				"autoscaling:DescribeAutoScalingInstances",
+				"autoscaling:DescribeScalingActivities",
+				"autoscaling:CreateLaunchConfiguration",
+				"autoscaling:DeleteLaunchConfiguration",
+				"autoscaling:DescribeLaunchConfigurations",
+				"autoscaling:AttachLoadBalancerTargetGroups",
+				"autoscaling:DetachLoadBalancerTargetGroups",
+				"autoscaling:SetDesiredCapacity"
+			],
+			"Resource": "*"
+		},
+		{
+			"Sid": "TerraformCreateELBServiceLinkedRole",
+			"Effect": "Allow",
+			"Action": [
+				"iam:CreateServiceLinkedRole"
+			],
+			"Resource": "*",
+			"Condition": {
+				"StringLike": {
+					"iam:AWSServiceName": "elasticloadbalancing.amazonaws.com"
+				}
+			}
+		},
+		{
+			"Sid": "TerraformPassRole",
+			"Effect": "Allow",
+			"Action": [
+				"iam:PassRole"
+			],
+			"Resource": "arn:aws:iam::521765619271:role/instanceRole"
+		}
+	]
+}
