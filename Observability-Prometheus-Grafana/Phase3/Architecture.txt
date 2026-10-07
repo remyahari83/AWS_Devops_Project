@@ -1,0 +1,26 @@
+                         EKS Cluster
+                             │
+                            Helm
+                             │
+                             ▼
+                  kube-prometheus-stack
+                             │
+          ┌──────────────────┼──────────────────┐
+          │                  │                  │
+          ▼                  ▼                  ▼
+     Prometheus           Grafana           Alertmanager
+          │
+          ├───────────────┐
+          │               │
+          ▼               ▼
+   node-exporter    kube-state-metrics
+
+
+
+
+Component	Purpose
+Prometheus	Collects and stores metrics
+Grafana	Visualizes metrics in dashboards
+Alertmanager	Handles/routes alerts from Prometheus
+node-exporter	CPU, memory, disk, network metrics from nodes
+kube-state-metrics	Kubernetes object/state metrics — Deployments, Pods, Nodes, etc.

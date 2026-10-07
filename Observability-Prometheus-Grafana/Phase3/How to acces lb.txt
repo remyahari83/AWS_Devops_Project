@@ -1,0 +1,1 @@
+ssh -i .\rg.pem -L 8080:k8s-monitori-kubeprom-198d3e09e8-40825fc2554ee2ee.elb.us-east-1.amazonaws.com:80 ubuntu@13.222.107.247

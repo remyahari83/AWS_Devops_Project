@@ -1,0 +1,57 @@
+Configure Aws cloud shell to access Kubernetes cluster:
+
+ Make a profile that automatically assumes the role
+
+Instead of manually handling those temporary credentials, configure a profile.
+
+Run:
+
+aws configure set role_arn arn:aws:iam::521765619271:role/EKSAdministrator \
+  --profile eks-admin
+
+Then:
+
+aws configure set source_profile terraform-gitlab \
+  --profile eks-admin
+
+Now test:
+
+aws sts get-caller-identity --profile eks-admin
+
+The ARN should look like:
+
+arn:aws:sts::521765619271:assumed-role/EKSAdministrator/...
+4. Configure kubectl using that profile
+aws eks update-kubeconfig \
+  --region us-east-1 \
+  --name eks-observability \
+  --profile eks-admin
+
+Then:
+
+kubectl get nodes
+
+You should finally get something like:
+
+NAME                             STATUS   ROLES    AGE   VERSION
+ip-10-0-1-xxx.ec2.internal      Ready    <none>   ...   ...
+ip-10-0-2-xxx.ec2.internal      Ready    <none>   ...   ...
+Important
+
+Don't run:
+
+aws configure
+
+without --profile, because that could overwrite the credentials/configuration currently associated with your default CloudShell profile.
+
+Use:
+
+terraform-gitlab → source identity
+        ↓
+EKSAdministrator → temporary credentials
+        ↓
+kubectl → EKS
+
+Run step 1 first and tell me the result.
+
+kubectl get nodes

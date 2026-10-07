@@ -1,0 +1,99 @@
+A. Add permission to terraform-gitlab
+Open AWS Console
+Search for IAM
+Go to IAM → Users
+Click terraform-gitlab
+Open the Permissions tab
+Click Add permissions
+Choose Add permissions
+Select Create inline policy
+Choose the JSON tab
+Paste:
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "sts:AssumeRole",
+      "Resource": "arn:aws:iam::521765619271:role/EKSAdministrator"
+    }
+  ]
+}
+Click Next
+Policy name:
+AssumeEKSAdministrator
+Click Create policy
+B. Configure EKSAdministrator trust
+
+Now go to:
+
+IAM → Roles → EKSAdministrator
+
+Click EKSAdministrator
+Select Trust relationships
+Click Edit trust policy
+Use:
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::521765619271:user/terraform-gitlab"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+Click Update policy
+C. Check EKS access policy
+
+Go to:
+
+EKS → Clusters → eks-observability → Access
+
+You should have an access entry for:
+
+EKSAdministrator
+
+Open it and make sure the associated policy is:
+
+AmazonEKSClusterAdminPolicy
+
+with:
+
+Access scope: Cluster
+D. Important: CloudShell still uses root
+
+This is the part that matters in your case.
+
+Your CloudShell currently reports:
+
+arn:aws:iam::521765619271:root
+
+Therefore, even after the above configuration, CloudShell will still be root.
+
+You need to authenticate CloudShell as terraform-gitlab before it can assume EKSAdministrator.
+
+If you have credentials for terraform-gitlab, run:
+
+aws configure --profile terraform-gitlab
+
+Then test:
+
+aws sts get-caller-identity --profile terraform-gitlab
+
+It should show:
+
+arn:aws:iam::521765619271:user/terraform-gitlab
+
+Then:
+
+aws sts assume-role \
+  --role-arn arn:aws:iam::521765619271:role/EKSAdministrator \
+  --role-session-name eks-admin \
+  --profile terraform-gitlab
+
+Once that succeeds, we'll configure the profile so your kubectl automatically uses EKSAdministrator.
+
+Do not paste the access key or secret into this chat.

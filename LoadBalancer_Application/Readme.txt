@@ -299,3 +299,14 @@ Once apply stage is completed, Go to cloud console, loadbalancer, copy the dns, 
 
 http://url
 eg: http://my-load-balancer-1548099333.us-east-1.elb.amazonaws.com
+--------------------------------------------------------
+                    Load Balancer
+                         |
+                         v
+               Backend Service
+                         |
+                         v
+                Regional MIG
+                 /          \
+                /            \
+          NGINX VM 1      NGINX VM 2

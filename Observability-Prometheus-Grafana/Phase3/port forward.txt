@@ -1,0 +1,4 @@
+kubectl port-forward -n monitoring svc/kube-prometheus-stack-grafana 3000:80
+
+ssh -i "rg.pem" -L 3000:localhost:3000 ubuntu@13.222.107.247
+http://localhost:3000

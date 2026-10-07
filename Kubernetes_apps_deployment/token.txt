@@ -1,0 +1,112 @@
+K1090296a4f74a9f9e9c5b076eade4d37a152bc7d95b6811b2c885443b22f69ce1d::server:db4474c87337d9f7c9cfa73076f46c56
+
+
+3.80.73.171
+
+
+
+
+ubuntu@ip-172-31-27-204:~$ hostname -I
+172.31.27.204 172.17.0.1 10.42.0.0 10.42.0.1
+
+connect to worker nodes with private ip.
+PS D:\remya\AWS> ssh -i "rg.pem" ubuntu@172.21.6.13
+
+
+curl -sfL https://get.k3s.io | \
+K3S_URL=https://172.31.27.204:6443 \
+K3S_TOKEN='K1090296a4f74a9f9e9c5b076eade4d37a152bc7d95b6811b2c885443b22f69ce1d::server:db4474c87337d9f7c9cfa73076f46c56' \
+sh -
+
+AQAEAF5kguVE-IMdfiLo7G_kt_E_LudkmbvtQYOZFxP6I6Dt0gbgvQ==
+export TOKEN=AQAEAF5kguVE-IMdfiLo7G_kt_E_LudkmbvtQYOZFxP6I6Dt0gbgvQ==
+
+
+curl -s \
+  -H "X-aws-ec2-metadata-token: $TOKEN" \
+  http://169.254.169.254/latest/meta-data/iam/security-credentials/
+
+ensure connectivity.
+ssh -i rg.pem ubuntu@32.192.244.187
+
+scp -i D:\remya\AWS\rg.pem D:\remya\AWS\rg.pem  ubuntu@32.192.244.187:/home/ubuntu/
+
+ssh -i rg.pem ubuntu@172.21.6.13
+
+ssh -i rg.pem ubuntu@172.21.5.168
+
+                Internet
+                       |
+                Public IP / SSH
+                       |
+              +------------------+
+              | K3s Control Plane|
+              | Public Subnet    |
+              +------------------+
+                       |
+                  Private VPC
+                       |
+             +---------+---------+
+             |                   |
+       +-----------+       +-----------+
+       | Worker 1  |       | Worker 2  |
+       | Private   |       | Private   |
+       +-----------+       +-----------+
+
+On control planeserver execute:
+curl -sfL https://get.k3s.io | sh -
+
+sudo systemctl status k3s
+
+If not running:sudo journalctl -u k3s -n 100 --no-pager
+
+VErify control plane:sudo kubectl get nodes
+
+ubuntu@ip-172-21-1-71:~$ hostname -I
+172.21.1.71 10.42.0.0 10.42.0.1
+
+
+get the token.
+sudo cat /var/lib/rancher/k3s/server/node-token
+
+ubuntu@ip-172-21-1-71:~$ sudo cat /var/lib/rancher/k3s/server/node-token
+K104e2b4c92932252b506b1264a5394eda5d202ef774bedd28a26213d97c4902275::server:1ddc51d32806db3753cf85916d453b2c
+
+connect to worker1:ssh ubuntu@<worker1-private-ip>
+
+
+sudo ssh -i rg.pem ubuntu@172.21.6.13
+
+curl -sfL https://get.k3s.io | \
+K3S_URL=https://172.21.1.71:6443 \
+K3S_TOKEN='K104e2b4c92932252b506b1264a5394eda5d202ef774bedd28a26213d97c4902275::server:1ddc51d32806db3753cf85916d453b2c' \
+sh -
+
+sudo journalctl -u k3s-agent -n 30 --no-pager
+
+ssh -i rg.pem ubuntu@172.21.5.168
+
+curl -sfL https://get.k3s.io | \
+K3S_URL=https://172.21.1.71:6443 \
+K3S_TOKEN='K104e2b4c92932252b506b1264a5394eda5d202ef774bedd28a26213d97c4902275::server:1ddc51d32806db3753cf85916d453b2c' \
+sh -
+
+sudo journalctl -u k3s-agent -n 30 --no-pager
+
+
+AWS
+│
+├── Public Subnet
+│   ├── GitLab Runner
+│   │   └── Terraform / CI
+│   │
+│   └── k3s Control Plane
+│       └── Kubernetes API :6443
+│
+└── Private Subnets
+    ├── k3s Worker 1
+    │
+    └── k3s Worker 2
+
+
+

@@ -1,0 +1,3 @@
+The code is only for infra setup and creating eks nodegroup. 
+
+Check the desired state. 

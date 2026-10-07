@@ -1,0 +1,21 @@
+Follow the steps to configure k3s:
+Step 2 — Put this in the existing server's user_data:
+
+curl -sfL https://get.k3s.io | sh -s - --disable=traefik
+
+Then after terraform apply, connect to the existing EC2 and verify:
+
+sudo kubectl get nodes
+
+You should get:
+
+NAME              STATUS   ROLES
+<server-name>     Ready    control-plane,master
+
+Then get:
+
+sudo cat /var/lib/rancher/k3s/server/node-token
+
+and:
+
+hostname -I
