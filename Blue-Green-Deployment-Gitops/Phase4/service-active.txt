@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+
+metadata:
+name: qa-active
+namespace: qa
+
+spec:
+type: LoadBalancer
+
+selector:
+app: qa-evaluator
+
+ports:
+- name: http
+port: 80
+targetPort: 8000

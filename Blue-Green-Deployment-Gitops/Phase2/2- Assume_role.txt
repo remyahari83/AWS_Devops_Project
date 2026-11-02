@@ -1,0 +1,14 @@
+Create a Git lab user called
+ terraform-GitLab. Grant it sts:AssumeRole permission + trusted relationship .The role is EKS administrator role which has AssumeEKSAdministrator on the eks cluster. 
+On aws shell , execute. aws sts get-caller-identity
+
+Check the cluster":
+aws eks describe-cluster \
+  --name eks-name \
+  --region us-east-1 \
+  --query 'cluster.status' \
+  --output text
+kubectl get nodes
+kubectl get pods -A
+
+If they work no need to change anything. 

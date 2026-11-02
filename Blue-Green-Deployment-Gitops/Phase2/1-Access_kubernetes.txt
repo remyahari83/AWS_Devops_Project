@@ -1,0 +1,35 @@
+To access Kubernetes cluster from aws shell, Make sure this role exists for runner machine with a bunch of permissions:
+
+terraform-gitlab-runner-role
+
+From aws shell, create access entry:
+
+aws eks create-access-entry \
+  --region us-east-1 \
+  --cluster-name eks-cicd-gitops \
+  --principal-arn arn:aws:iam::521765619271:role/terraform-gitlab-runner-role \
+  --type STANDARD
+
+Attached EKS Cluster Admin permission:
+aws eks associate-access-policy \
+  --region us-east-1 \
+  --cluster-name eks-cicd-gitops \
+  --principal-arn arn:aws:iam::521765619271:role/terraform-gitlab-runner-role \
+  --policy-arn arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy \
+  --access-scope type=cluster
+
+Verify configuration:
+
+aws eks list-associated-access-policies \
+  --region us-east-1 \
+  --cluster-name eks-cicd-gitops \
+  --principal-arn arn:aws:iam::521765619271:role/terraform-gitlab-runner-role
+
+Update kubeconfig:
+aws eks update-kubeconfig \
+  --region us-east-1 \
+  --name eks-cicd-gitops
+
+Verify:
+kubectl get nodes
+

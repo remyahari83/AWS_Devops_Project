@@ -1,0 +1,346 @@
+INFO: Argo CD itself does not perform the blue-green traffic switching. Argo Rollouts does. Argo CD continuously syncs the Kubernetes manifests, while Rollouts manages the deployment strategy.
+
+1. Install Argo Rollouts in EKS
+kubectl create namespace argo-rollouts
+
+kubectl apply -n argo-rollouts \
+  -f https://github.com/argoproj/argo-rollouts/releases/latest/download/install.yaml
+
+Verify if rollout controller is running:
+
+kubectl get pods -n argo-rollouts
+
+
+Install the CLI on the EC2/Jenkins machine:
+
+curl -LO https://github.com/argoproj/argo-rollouts/releases/latest/download/kubectl-argo-rollouts-linux-amd64
+
+sudo install -m 555 kubectl-argo-rollouts-linux-amd64 \
+  /usr/local/bin/kubectl-argo-rollouts
+
+kubectl argo rollouts version
+
+2. Convert the Deployment to a Rollout 
+The current deployment is:qa-evaluator
+Instead of: "kind: Deployment" , create:"kind: Rollout"
+
+Example:
+
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: qa-evaluator
+  namespace: qa
+spec:
+  replicas: 2
+
+  revisionHistoryLimit: 2
+
+  selector:
+    matchLabels:
+      app: qa-evaluator
+
+  template:
+    metadata:
+      labels:
+        app: qa-evaluator
+    spec:
+      containers:
+        - name: qa-evaluator
+          image: 521765619271.dkr.ecr.us-east-1.amazonaws.com/myapp:1
+          ports:
+            - containerPort: 8000
+
+  strategy:
+    blueGreen:
+      activeService: qa-evaluator-active
+      previewService: qa-evaluator-preview
+      autoPromotionEnabled: false
+      scaleDownDelaySeconds: 30
+
+The important part is:
+
+strategy:
+  blueGreen:
+    activeService: qa-evaluator-active
+    previewService: qa-evaluator-preview
+    autoPromotionEnabled: false
+
+This tells Rollouts:
+Keep the current version serving production traffic while creating the new version separately.
+
+3. Create the Active Service
+
+This is the service users access.
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: qa-evaluator-active
+  namespace: qa
+spec:
+  type: LoadBalancer
+  selector:
+    app: qa-evaluator
+  ports:
+    - port: 80
+      targetPort: 8000
+
+The existing AWS Load Balancer can be represented by this service.
+
+4. Create the Preview Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: qa-evaluator-preview
+  namespace: qa
+spec:
+  type: LoadBalancer
+  selector:
+    app: qa-evaluator
+  ports:
+    - port: 80
+      targetPort: 8000
+
+The difference is conceptual:
+
+qa-evaluator-active
+        ↓
+      BLUE
+   Production
+
+qa-evaluator-preview
+        ↓
+     GREEN
+ New version
+
+5. Put these manifests in GitOps repository
+
+Structure the repo like:
+
+gitops/
+└── qa-evaluator/
+    ├── rollout.yaml
+    ├── active-service.yaml
+    ├── preview-service.yaml
+    └── kustomization.yaml
+
+Example:
+
+resources:
+  - rollout.yaml
+  - active-service.yaml
+  - preview-service.yaml
+
+6. Configure Argo CD
+
+Install Argo CD into EKS:
+
+kubectl create namespace argocd
+
+kubectl apply -n argocd \
+  -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+Check:
+
+kubectl get pods -n argocd
+
+Then expose the Argo CD server temporarily:
+
+kubectl port-forward svc/argocd-server \
+  -n argocd 8080:443
+
+argocd can be accessed via url :https://localhost:8080
+
+Get the initial password:
+argocd admin initial-password -n argocd
+
+7. Connect Argo CD to the GitLab GitOps repository.
+
+For example:
+
+argocd repo add https://gitlab.com/YOUR_USER/YOUR_GITOPS_REPO.git \
+  --username USERNAME \
+  --password GITLAB_TOKEN
+
+Then create an Argo CD Application:
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: qa-evaluator
+  namespace: argocd
+spec:
+  project: default
+
+  source:
+    repoURL: https://gitlab.com/USER/GITOPS_REPO.git
+    targetRevision: main
+    path: qa-evaluator
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: qa
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+
+Apply:
+kubectl apply -f application.yaml
+
+Now:
+
+GitLab GitOps repo
+       ↓
+     Argo CD
+       ↓
+      EKS
+
+
+8. The actual Blue-Green test
+
+
+Version 1
+
+Initially:
+
+BLUE
+Release 1
+
+Argo Rollouts shows:
+
+kubectl argo rollouts get rollout qa-evaluator -n qa
+
+Should be able to see the current revision.
+
+9. Jenkins builds Release 2
+
+The simple code change was to update the application banner :
+
+Customer Support QA Evaluator
+Release 1
+
+to:
+
+Customer Support QA Evaluator
+Release 2
+
+Jenkins:
+
+GitLab
+  ↓
+Jenkins
+  ↓
+pytest
+  ↓
+SonarQube
+  ↓
+Docker build
+  ↓
+ECR
+
+Then Jenkins updates the GitOps manifest:
+
+image: 521765619271.dkr.ecr.us-east-1.amazonaws.com/myapp:2
+
+and commits:
+
+Update QA evaluator image to 2
+
+to the GitOps repo.
+
+10. Argo CD detects the change
+
+Argo CD sees:
+
+Git desired state:
+myapp:2
+
+EKS current state:
+myapp:1
+
+It syncs the new image.
+
+Argo Rollouts then creates:
+
+BLUE                         GREEN
+Release 1                    Release 2
+   ↓                            ↓
+Active Service              Preview Service
+   ↓                            ↓
+Users                       Testing
+
+Because you configured:
+
+autoPromotionEnabled: false
+
+Release 1 continues serving production traffic.
+
+This is the key advantage of blue-green.
+
+11. Test GREEN
+
+You can test the preview version:
+
+kubectl get svc -n qa
+
+If the preview service is ClusterIP:
+
+kubectl run curl-test \
+  --rm -it \
+  --image=curlimages/curl \
+  -- sh
+
+Then:
+
+curl http://qa-evaluator-preview.qa.svc.cluster.local
+
+We should see:
+
+Customer Support QA Evaluator
+Release 2
+
+while production still shows:
+
+Release 1
+12. Promote GREEN
+
+Once you are satisfied:
+
+kubectl argo rollouts promote qa-evaluator -n qa
+
+Traffic switches:
+
+Before:
+
+Users
+  ↓
+BLUE — Release 1
+
+
+After:
+
+Users
+  ↓
+GREEN — Release 2
+
+Now Release 2 becomes the active version.
+
+13. Rollback
+
+
+Suppose Release 2 has a problem.
+
+We can abort by executing below command:
+
+kubectl argo rollouts abort qa-evaluator -n qa
+
+or roll back to the previous revision:
+
+kubectl argo rollouts undo qa-evaluator -n qa
+
+The important architectural point is:
+
+Argo CD manages desired state; Argo Rollouts manages progressive deployment and promotion/rollback.

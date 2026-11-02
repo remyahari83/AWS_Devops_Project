@@ -1,0 +1,2 @@
+1.eks.tf :we create the EKS cluster "eks-cicd-gitops",  eks access entry "terraform_admin" to grant access to the entity running terraform on the EKS cluster. Along with this grant AmazonEKSClusterAdminPolicy.
+2.eks_cluster.tf Create the EKS cluster with the addons and specification for managed node group. 

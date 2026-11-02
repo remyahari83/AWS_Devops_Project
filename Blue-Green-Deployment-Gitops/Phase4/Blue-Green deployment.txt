@@ -1,0 +1,243 @@
+GitLab
+   │
+   │ push new image
+   ▼
+Git repository
+   │
+   ▼
+Argo CD
+   │
+   ▼
+Argo Rollout
+   │
+   ├── Blue = current production version
+   │       │
+   │       ▼
+   │   qa-active Service ───► Users
+   │
+   └── Green = new version
+           │
+           ▼
+       qa-preview Service
+
+--------------------------------------------------------------------------------------------------
+In the development env/visual studio code:
+
+1. Build a new image:
+docker build -t qa-evaluator-app .
+
+2. make sure it works fine.
+docker run -p 8000:8000 --env-file .env qa-evaluator-app
+
+http://localhost:8000
+
+3. Tag with a new version.
+docker tag qa-evaluator-app:latest 521765619271.dkr.ecr.us-east-1.amazonaws.com/qa-evaluator-app:1.0.0
+
+4. Push
+
+Before that create ecr repository in aws:
+aws ecr create-repository --repository-name qa-evaluator-app --region us-east-1
+
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 521765619271.dkr.ecr.us-east-1.amazonaws.com
+
+docker push 521765619271.dkr.ecr.us-east-1.amazonaws.com/qa-evaluator-app:1.0.0
+
+5. Do the code change:
+docker build -t qa-evaluator-app:1.1.0 .
+
+6. Test again.
+
+docker run -p 8000:8000 --env-file .env qa-evaluator-app:1.1.0
+
+7. Tag again.
+
+docker tag qa-evaluator-app:1.1.0 521765619271.dkr.ecr.us-east-1.amazonaws.com/qa-evaluator-app:1.1.0
+
+8. Push
+docker push 521765619271.dkr.ecr.us-east-1.amazonaws.com/qa-evaluator-app:1.1.0
+
+Blue:
+521765619271.dkr.ecr.us-east-1.amazonaws.com/qa-evaluator-app:1.0.0
+
+Green:
+521765619271.dkr.ecr.us-east-1.amazonaws.com/qa-evaluator-app:1.1.0
+
+
+9. Put rollout.yaml, service-active.yaml, service-preview.yaml in gitlab gitops directory. 
+
+-------------------------------------------------------------------------------------------
+
+1. Apply the Rollouts manifest server-side
+
+Run:
+kubectl create namespace argo-rollouts
+
+cd /tmp
+
+curl -L https://github.com/argoproj/argo-rollouts/releases/latest/download/install.yaml \
+  -o argo-rollouts-install.yaml
+
+Then:
+
+kubectl apply --server-side --force-conflicts \
+  -f /tmp/argo-rollouts-install.yaml
+
+Server-side apply avoids the huge last-applied-configuration annotation that is causing the error.
+
+2. Check the CRDs
+
+Run:
+
+kubectl get crd | grep argoproj.io
+
+You should see at least:
+
+analysistemplates.argoproj.io
+analysisruns.argoproj.io
+clusteranalysistemplates.argoproj.io
+experiments.argoproj.io
+rollouts.argoproj.io
+3. Check the controller
+kubectl get pods -n argo-rollouts
+
+Login to argocd and create repository connection and application. give the path of yaml files (3 - rollout, service-active, service-preview) and url of GitLab.
+
+Sync it. then check the loadbalancer address of the application.
+kubectl get rollouts -n qa
+kubectl get pods -n qa -o wide
+kubectl get svc -n qa
+kubectl get rs -n qa
+
+Then access the url. should be able to see that application is blue version. 
+
+Check:
+
+~ $ kubectl get pods -n qa
+NAME                            READY   STATUS    RESTARTS   AGE
+qa-evaluator-5cccbf547d-n6t4c   1/1     Running   0          6m39s
+qa-evaluator-5cccbf547d-vf476   1/1     Running   0          6m39s
+qa-evaluator-76c6558669-8cg8v   1/1     Running   0          17m
+qa-evaluator-76c6558669-958r7   1/1     Running   0          17m
+~ $ kubectl get rollouts -n qa
+NAME           DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+qa-evaluator   2         4         2            2           17m
+
+Test green:
+kubectl run curl-test \
+  -n qa \
+  --rm -it \
+  --image=curlimages/curl \
+  --restart=Never \
+  -- curl http://qa-preview/docs
+------------------------------------------------------------------------------------
+Install argo plugin.
+
+~ $ curl -LO https://github.com/argoproj/argo-rollouts/releases/latest/download/kubectl-argo-rollouts-linux-amd64
+  % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+                                 Dload  Upload  Total   Spent   Left   Speed
+  0      0   0      0   0      0      0      0                              0
+  0      0   0      0   0      0      0      0                              0
+100 135.0M 100 135.0M   0      0 154.8M      0                              0
+~ $ chmod +x kubectl-argo-rollouts-linux-amd64
+~ $ sudo mv kubectl-argo-rollouts-linux-amd64 /usr/local/bin/kubectl-argo-rollouts
+~ $ kubectl argo rollouts version
+kubectl-argo-rollouts: v1.10.0+d90700a
+  BuildDate: 2026-08-27T15:22:01Z
+  GitCommit: d90700ae8d71d141561f0c546e19f999bb335cbd
+  GitTreeState: clean
+  GoVersion: go1.26.7
+  Compiler: gc
+  Platform: linux/amd64
+~ $ kubectl argo rollouts get rollout qa-evaluator -n qa
+Name:            qa-evaluator
+Namespace:       qa
+Status:          ॥ Paused
+Message:         BlueGreenPause
+Strategy:        BlueGreen
+Images:          521765619271.dkr.ecr.us-east-1.amazonaws.com/qa-evaluator-app:1.0.0 (stable, active)
+                 521765619271.dkr.ecr.us-east-1.amazonaws.com/qa-evaluator-app:1.1.0 (preview)
+Replicas:
+  Desired:       2
+  Current:       4
+  Updated:       2
+  Ready:         2
+  Available:     2
+
+NAME                                      KIND        STATUS     AGE  INFO
+⟳ qa-evaluator                            Rollout     ॥ Paused   22m  
+├──# revision:2                                                       
+│  └──⧉ qa-evaluator-5cccbf547d           ReplicaSet  ✔ Healthy  11m  preview
+│     ├──□ qa-evaluator-5cccbf547d-n6t4c  Pod         ✔ Running  11m  ready:1/1
+│     └──□ qa-evaluator-5cccbf547d-vf476  Pod         ✔ Running  11m  ready:1/1
+└──# revision:1                                                       
+   └──⧉ qa-evaluator-76c6558669           ReplicaSet  ✔ Healthy  22m  stable,active
+      ├──□ qa-evaluator-76c6558669-8cg8v  Pod         ✔ Running  22m  ready:1/1
+      └──□ qa-evaluator-76c6558669-958r7  Pod         ✔ Running  22m  ready:1/1
+~ $ 
+
+
+Promote plugin:
+kubectl argo rollouts promote qa-evaluator -n qa
+
+rollout 'qa-evaluator' promoted
+~ $ 
+
+Verify:
+~ $ kubectl argo rollouts get rollout qa-evaluator -n qa
+Name:            qa-evaluator
+Namespace:       qa
+Status:          ✔ Healthy
+Strategy:        BlueGreen
+Images:          521765619271.dkr.ecr.us-east-1.amazonaws.com/qa-evaluator-app:1.0.0
+                 521765619271.dkr.ecr.us-east-1.amazonaws.com/qa-evaluator-app:1.1.0 (stable, active)
+Replicas:
+  Desired:       2
+  Current:       4
+  Updated:       2
+  Ready:         2
+  Available:     2
+
+NAME                                      KIND        STATUS     AGE  INFO
+⟳ qa-evaluator                            Rollout     ✔ Healthy  24m  
+├──# revision:2                                                       
+│  └──⧉ qa-evaluator-5cccbf547d           ReplicaSet  ✔ Healthy  13m  stable,active
+│     ├──□ qa-evaluator-5cccbf547d-n6t4c  Pod         ✔ Running  13m  ready:1/1
+│     └──□ qa-evaluator-5cccbf547d-vf476  Pod         ✔ Running  13m  ready:1/1
+└──# revision:1                                                       
+   └──⧉ qa-evaluator-76c6558669           ReplicaSet  ✔ Healthy  24m  delay:6s
+      ├──□ qa-evaluator-76c6558669-8cg8v  Pod         ✔ Running  24m  ready:1/1
+      └──□ qa-evaluator-76c6558669-958r7  Pod         ✔ Running  24m  ready:1/1
+~ $ 
+
+Get endpoint and check.
+~ $ kubectl get svc qa-active -n qa
+NAME        TYPE           CLUSTER-IP       EXTERNAL-IP                                                               PORT(S)        AGE
+qa-active   LoadBalancer   10.100.139.129   ae062d5b4cdd84ee0b6882161d124a87-1323392493.us-east-1.elb.amazonaws.com   80:32513/TCP   25m
+
+Verify application changes.
+
+----------------------------------------------------------------------------------------
+Verify with curl test that banner has changed for application.
+
+kubectl run curl-active \
+  -n qa \
+  --rm -it \
+  --image=curlimages/curl \
+  --restart=Never \
+  -- curl -s "http://qa-active/docs"
+
+    <link rel="shortcut icon" href="https://fastapi.tiangolo.com/img/favicon.png">
+    <title>Customer Support QA Evaluator v1.1.0 - Swagger UI</title>
+    </head>
+    <body>
+    <div id="swagger-ui">
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+    <!-- `SwaggerUIBundle` is now available on the page -->
+
+Next step is to connect this to  GitLab CI/CD pipeline, so that a GitLab commit builds the application, pushes the new version to ECR, updates the GitOps manifest, and then Argo CD automatically deploys the new version.
+
+
+
+

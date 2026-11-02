@@ -1,0 +1,37 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: qa-evaluator
+  namespace: qa
+
+spec:
+  replicas: 2
+
+  strategy:
+    blueGreen:
+      activeService: qa-active
+      previewService: qa-preview
+      autoPromotionEnabled: false
+
+  selector:
+    matchLabels:
+      app: qa-evaluator
+
+  template:
+    metadata:
+      labels:
+        app: qa-evaluator
+
+    spec:
+      containers:
+        - name: qa-evaluator
+          image: 521765619271.dkr.ecr.us-east-1.amazonaws.com/qa-evaluator-app:1.1.0
+          ports:
+            - containerPort: 8000
+
+          env:
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: qa-evaluator-secrets
+                  key: OPENAI_API_KEY
