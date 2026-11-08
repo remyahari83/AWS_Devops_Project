@@ -1,7 +1,8 @@
-Aim of this project is to use Jenkins tool to  build the image after Testing with SonarQube Or manually push the image after building locally in docker to ECR. 
+Aim of this project was to use Jenkins tool to  build the image after Testing with SonarQube Or manually push the image after building locally in docker to ECR. 
 Create cloud environment with Vpc, subnet, EKS, deployment, external load balancer. The deployment uses the image from ECR. Install Argo CD, Argo Rollouts and perform Blue green deployment. 
 Output is captured in Screenshots in outputs folder. This was performed in Different phases. 
 
+Note: Image build with Jenkins and Testing with SonarQube subsequent pushing to ECR etc will be done as a different project. Here the application was containerized with docker and pushed to ECR due to execution constraints. 
 Install Argo CD
 GitLab
    ↓
